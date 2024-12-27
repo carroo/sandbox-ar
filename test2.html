@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pendeteksi Gambar dengan Kamera</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+        }
+        #result {
+            margin: 20px;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pendeteksi Gambar dengan Kamera</h1>
+    <video id="video" autoplay></video>
+    <div id="result">Hasil deteksi akan muncul di sini...</div>
+    <button id="startDetection">Mulai Deteksi</button>
+    <button id="stopDetection">Hentikan Deteksi</button>
+
+    <script>
+        const video = document.getElementById('video');
+        const resultDiv = document.getElementById('result');
+        const startButton = document.getElementById('startDetection');
+        const stopButton = document.getElementById('stopDetection');
+        let model;
+        let isDetecting = false;
+
+        // Fungsi untuk memulai kamera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error('Error: ' + err);
+                alert('Tidak dapat mengakses kamera. Pastikan browser Anda mengizinkan akses kamera.');
+            }
+        }
+
+        // Fungsi untuk memuat model
+        async function loadModel() {
+            resultDiv.innerHTML = 'Memuat model...';
+            try {
+                model = await mobilenet.load();
+                resultDiv.innerHTML = 'Model siap. Klik "Mulai Deteksi" untuk memulai.';
+            } catch (err) {
+                console.error('Error loading model:', err);
+                resultDiv.innerHTML = 'Error memuat model. Silakan muat ulang halaman.';
+            }
+        }
+
+        // Fungsi untuk mendeteksi gambar
+        async function detectImage() {
+            if (!model || !isDetecting) return;
+
+            try {
+                const predictions = await model.classify(video);
+                if (predictions && predictions.length > 0) {
+                    const topPrediction = predictions[0];
+                    resultDiv.innerHTML = `
+                        Terdeteksi: ${topPrediction.className}<br>
+                        Tingkat keyakinan: ${(topPrediction.probability * 100).toFixed(2)}%
+                    `;
+                }
+            } catch (err) {
+                console.error('Error during detection:', err);
+            }
+
+            if (isDetecting) {
+                requestAnimationFrame(detectImage);
+            }
+        }
+
+        // Event listeners
+        startButton.addEventListener('click', () => {
+            isDetecting = true;
+            detectImage();
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        });
+
+        stopButton.addEventListener('click', () => {
+            isDetecting = false;
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            resultDiv.innerHTML = 'Deteksi dihentikan';
+        });
+
+        // Inisialisasi
+        startCamera();
+        loadModel();
+    </script>
+</body>
+</html>

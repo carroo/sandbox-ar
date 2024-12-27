@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Tracking with Tracking.js</title>
+</head>
+
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking/1.1.3/tracking.min.js"></script>
+    <script>
+        // Akses kamera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function (stream) {
+                // Tentukan elemen video
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+            })
+            .catch(function (error) {
+                console.log('Error accessing camera: ', error);
+            });
+
+        // Menyiapkan Canvas
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+
+        // Membuat tracker untuk melacak pola gambar
+        const tracker = new tracking.ColorTracker();
+
+        // Menambahkan pola custom untuk pelacakan
+        tracker.setPatterns([{
+            name: 'custom-pattern',
+            pattern: 'img2.jpg' // Ganti dengan URL gambar pola yang akan dilacak
+        }]);
+
+        // Mulai pelacakan objek
+        tracking.track('#video', tracker, { camera: true });
+
+        // Menangani hasil pelacakan
+        tracker.on('track', function (event) {
+            context.clearRect(0, 0, canvas.width, canvas.height); // Membersihkan canvas
+            event.data.forEach(function (rect) {
+                context.strokeStyle = '#ff0000'; // Warna garis
+                context.lineWidth = 2;
+                context.strokeRect(rect.x, rect.y, rect.width, rect.height); // Gambar kotak di sekitar objek yang dilacak
+            });
+        });
+
+    </script>
+</body>
+
+</html>

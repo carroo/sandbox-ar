@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pendeteksi Foto Polaroid Custom</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+        }
+        .button-group {
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        #result {
+            margin: 20px;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .training-buttons button {
+            background-color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pendeteksi Foto Polaroid Custom</h1>
+    <video id="video" autoplay></video>
+    <div id="result">Siap untuk pelatihan...</div>
+    
+    <div class="training-buttons">
+        <h3>Mode Pelatihan:</h3>
+        <button id="trainA">Latih sebagai Foto A</button>
+        <button id="trainB">Latih sebagai Foto B</button>
+        <button id="trainC">Latih sebagai Foto C</button>
+        <div>
+            <small>Tekan dan tahan tombol sambil mengarahkan kamera ke foto yang ingin dilatih</small>
+        </div>
+    </div>
+
+    <div class="button-group">
+        <h3>Mode Deteksi:</h3>
+        <button id="startDetection">Mulai Deteksi</button>
+        <button id="stopDetection" disabled>Hentikan Deteksi</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const resultDiv = document.getElementById('result');
+        const startButton = document.getElementById('startDetection');
+        const stopButton = document.getElementById('stopDetection');
+        
+        let net;
+        let classifier;
+        let isDetecting = false;
+
+        // Inisialisasi kamera dan model
+        async function init() {
+            try {
+                // Mulai kamera
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+
+                // Tunggu video siap
+                await new Promise((resolve) => {
+                    video.onloadeddata = () => resolve();
+                });
+
+                // Muat model dan classifier
+                resultDiv.innerText = 'Memuat model...';
+                net = await mobilenet.load();
+                classifier = knnClassifier.create();
+                
+                resultDiv.innerText = 'Model siap! Silakan latih model dengan foto-foto Anda.';
+
+                // Setup event listeners untuk training buttons
+                setupTrainingButtons();
+            } catch (err) {
+                console.error(err);
+                resultDiv.innerText = 'Error: ' + err.message;
+            }
+        }
+
+        // Setup tombol training
+        function setupTrainingButtons() {
+            const addExample = async (classId) => {
+                // Ambil aktivasi dari MobileNet dari video frame
+                const activation = net.infer(video, 'conv_preds');
+                // Tambahkan ke classifier
+                classifier.addExample(activation, classId);
+                resultDiv.innerText = `Menambahkan contoh untuk Foto ${classId}...`;
+            };
+
+            // Setup event listeners untuk setiap tombol
+            ['A', 'B', 'C'].forEach(classId => {
+                const button = document.getElementById(`train${classId}`);
+                button.addEventListener('mousedown', () => addExample(classId));
+                button.addEventListener('mouseup', () => {
+                    resultDiv.innerText = 'Pelatihan selesai untuk Foto ' + classId;
+                });
+            });
+        }
+
+        // Fungsi untuk deteksi
+        async function detect() {
+            if (!isDetecting) return;
+
+            if (classifier.getNumClasses() > 0) {
+                // Ambil aktivasi dari MobileNet
+                const activation = net.infer(video, 'conv_preds');
+                // Dapatkan prediksi
+                const result = await classifier.predictClass(activation);
+                
+                // Tampilkan hasil
+                resultDiv.innerText = `Ini adalah Foto ${result.label}\nTingkat keyakinan: ${(result.confidences[result.label] * 100).toFixed(2)}%`;
+            }
+
+            requestAnimationFrame(detect);
+        }
+
+        // Event listeners untuk tombol start/stop
+        startButton.addEventListener('click', () => {
+            if (classifier.getNumClasses() > 0) {
+                isDetecting = true;
+                detect();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            } else {
+                alert('Harap latih model terlebih dahulu dengan minimal satu foto!');
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            isDetecting = false;
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            resultDiv.innerText = 'Deteksi dihentikan';
+        });
+
+        // Mulai aplikasi
+        init();
+    </script>
+</body>
+</html>
